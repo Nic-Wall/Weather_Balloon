@@ -3,3 +3,6 @@ manual/
 
 # QEMU directory
 qemu/
+
+# Custom Obsidian JSON
+Docs/.obsidian/
