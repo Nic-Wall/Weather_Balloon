@@ -1,0 +1,5 @@
+# Build output
+manual/
+
+# QEMU directory
+qemu/
