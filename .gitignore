@@ -5,4 +5,4 @@ manual/
 qemu/
 
 # Custom Obsidian JSON
-Docs/.obsidian/*
+Docs/.obsidian/
