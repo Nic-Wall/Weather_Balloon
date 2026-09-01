@@ -1,3 +1,5 @@
+# Build cross-compiler
+
 # Build bootloader
 printf "Creating manual/bootloader/ qemu and rockpro directories...\n"
 mkdir -p manual/bootloader/qemu
