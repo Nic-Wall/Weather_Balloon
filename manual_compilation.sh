@@ -1,4 +1,11 @@
+#!/bin/bash
+
 # Build cross-compiler
+mkdir -p manual/crossCompiler
+cd manual/crossCompiler
+curl https://toolchains.bootlin.com/downloads/releases/toolchains/aarch64/tarballs/aarch64--glibc--stable-2025.08-1.tar.xz --output aarch64--glibc--stable-2025.08-1.tar.xz
+tar -xf aarch64--glibc--stable-2025.08-1.tar.xz
+export PATH="$PATH:$(pwd)/manual/crossCompiler/aarch64--glibc--stable-2025.08-1/bin/"
 
 # Build bootloader
 printf "Creating manual/bootloader/ qemu and rockpro directories...\n"
@@ -10,7 +17,7 @@ git clone --depth 1 -b lts-v2.8 https://github.com/TrustedFirmware-A/trusted-fir
 cd trusted-firmware-a
 make distclean
 printf "Compiling the Trusted-Firmware-A reference implementation for the rk3399 platform...\n"
-make CROSS_COMPILE=aarch64-linux-gnu- PLAT=rk3399
+make CROSS_COMPILE=aarch64-buildroot-linux-gnu-gcc PLAT=rk3399
 cd ..
 
 printf "Cloning the U-Boot (v2026.04) repository...\n"
@@ -25,13 +32,13 @@ export BL31=../trusted-firmware-a/build/rk3399/release/bl31/bl31.elf
 printf "Compiling the rockpro64-rk3399 U-Boot binary...\n"
 # Below is imported from manual_configs 
 #make rockpro64-rk3399_defconfig
-make CROSS_COMPILE=aarch64-linux-gnu- O=../rockpro
+make CROSS_COMPILE=aarch64-buildroot-linux-gnu-gcc O=../rockpro
 make mrproper
 printf "Removing the BL31 shell variable...\n"
 unset BL31
 printf "Compiling the QEMU U-Boot binary for arm64...\n"
 make qemu_arm64_defconfig O=../qemu
-make CROSS_COMPILE=aarch64-linux-gnu- O=../qemu
+make CROSS_COMPILE=aarch64-buildroot-linux-gnu-gcc O=../qemu
 cd ../..
 printf "Finished setting up U-Boot for QEMU and the RockPro board...\n"
 
@@ -44,16 +51,16 @@ git clone git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git
 cd linux-stable
 git checkout v7.0-rc6
 printf "Preparing the linux-stable kernel for compilation...\n"
-make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- O=../build_arm64 prepare
+make ARCH=arm64 CROSS_COMPILE=aarch64-buildroot-linux-gnu-gcc O=../build_arm64 prepare
 printf "Copying the the pre-made Linux kernel .config into the manual/kernel/build_arm64 directory...\n"
 cp ../../../manual_configs/rockpro_kernel.config ../build_arm64/.config
 printf "Compiling the kernel into manual/kernel/build_arm64/Image.gz\n"
-make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- Image.gz O=../build_arm64
+make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-buildroot-linux-gnu-gcc Image.gz O=../build_arm64
 printf "Compiling the device tree into the manual/kernel/build_arm64 directory...\n"
-make ARCH=arm64 dtbs CROSS_COMPILE=aarch64-linux-gnu- O=../build_arm64
+make ARCH=arm64 dtbs CROSS_COMPILE=aarch64-buildroot-linux-gnu-gcc O=../build_arm64
 printf "Compiling and installing the modules into the manual/kernel/modules directory...\n"
-make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../modules O=../build_arm64
-make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../modules O=../build_arm64 modules_install
+make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-buildroot-linux-gnu-gcc INSTALL_MOD_PATH=../modules O=../build_arm64
+make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-buildroot-linux-gnu-gcc INSTALL_MOD_PATH=../modules O=../build_arm64 modules_install
 cd ../..
 printf "Finished compiling the Linux kernel, device tree, and modules...\n"
 
@@ -89,9 +96,9 @@ make distclean
 printf "Copying the pre-made BusyBox .config into manual/filesystem/u-boot/.config...\n"
 cp ../../manual_configs/rockpro_busybox.config .config
 printf "Compiling BusyBox..."
-make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-
+make ARCH=arm64 CROSS_COMPILE=aarch64-buildroot-linux-gnu-gcc
 printf "Installing BusyBox into manual/filesystem/rootfs...\n"
-make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- install
+make ARCH=arm64 CROSS_COMPILE=aarch64-buildroot-linux-gnu-gcc install
 cd ..
 printf "SUDO REQUIRED: chown root:root and setuid root for the busybox binary in manual/filesystem/rootfs/usr/bin/busybox...\n"
 sudo chown root:root rootfs/bin/busybox
