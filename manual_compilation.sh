@@ -116,6 +116,9 @@ cd ..
 printf "SUDO REQUIRED: chown root:root and setuid root for the busybox binary in manual/filesystem/rootfs/usr/bin/busybox...\n"
 sudo chown root:root rootfs/bin/busybox
 sudo chmod u+s rootfs/bin/busybox
+printf "Moving udhcpc simple.script into rootfs usr/share/udhcpc/default.script..."
+mkdir -p rootfs/usr/share/udhcpc
+cp busybox/examples/udhcp/simple.script rootfs/usr/share/udhcpc/default.script
 printf "Finished creating and installing BusyBox core-utils...\n"
 
 # Generate initramfs
