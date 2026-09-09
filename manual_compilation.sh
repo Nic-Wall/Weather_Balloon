@@ -30,7 +30,7 @@ git clone --depth 1 -b lts-v2.8 https://github.com/TrustedFirmware-A/trusted-fir
 cd trusted-firmware-a
 make distclean
 printf "Compiling the Trusted-Firmware-A reference implementation for the rk3399 platform...\n"
-make CROSS_COMPILE=aarch64-buildroot-linux-gnu- PLAT=rk3399
+make CROSS_COMPILE=aarch64-buildroot-linux-gnu- PLAT=rk3399 M0_CROSS_COMPILE=$BUILD_DIR/crossCompiler/arm-gnu-toolchain-15.3.rel1-x86_64-arm-none-eabi/bin/arm-none-eabi-
 cd ..
 
 printf "Cloning the U-Boot (v2026.04) repository...\n"
