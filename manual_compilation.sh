@@ -63,10 +63,10 @@ printf "Cloning the linux-stable kernel source (v7.0-rc6)...\n"
 git clone git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git
 cd linux-stable
 git checkout v7.0-rc6
-#printf "Preparing the linux-stable kernel for compilation...\n"
-#make ARCH=arm64 CROSS_COMPILE=aarch64-buildroot-linux-gnu- O=../build_arm64 prepare
 printf "Copying the the pre-made Linux kernel .config into the manual/kernel/build_arm64 directory...\n"
 cp $BUILD_DIR/../manual_configs/rockpro_kernel.config ../build_arm64/.config
+printf "Preparing the linux-stable kernel build environment...\n"
+make ARCH=arm64 CROSS_COMPILE=aarch64-buildroot-linux-gnu- O=../build_arm64 prepare
 printf "Compiling the kernel into manual/kernel/build_arm64/Image.gz\n"
 make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-buildroot-linux-gnu- Image.gz O=../build_arm64
 printf "Compiling the device tree into the manual/kernel/build_arm64 directory...\n"
@@ -116,7 +116,6 @@ cd ..
 printf "SUDO REQUIRED: chown root:root and setuid root for the busybox binary in manual/filesystem/rootfs/usr/bin/busybox...\n"
 sudo chown root:root rootfs/bin/busybox
 sudo chmod u+s rootfs/bin/busybox
-cd ..
 printf "Finished creating and installing BusyBox core-utils...\n"
 
 # Generate initramfs
