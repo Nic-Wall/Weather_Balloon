@@ -6,3 +6,6 @@ qemu/
 
 # Custom Obsidian JSON
 Docs/.obsidian/
+
+# Inclusion of empty directories
+!.empty
