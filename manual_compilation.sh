@@ -14,9 +14,9 @@ export PATH="$PATH:$BUILD_DIR/crossCompiler/aarch64--glibc--stable-2025.08-1/bin
 # Install the arm-none-eabi from ARM for the compilation of the M0 driver
 curl https://gitlab.arm.com/api/v4/projects/tooling%2Fgnu-toolchains-for-arm/packages/generic/gnu-toolchain/15.3.rel1/arm-gnu-toolchain-15.3.rel1-x86_64-arm-none-eabi.tar.xz --output arm-gnu-toolchain-15.3.rel1-x86_64-arm-none-eabi.tar.xz
 tar -xf arm-gnu-toolchain-15.3.rel1-x86_64-arm-none-eabi.tar.xz
-cd $BUILD_DIR
 
 # Build bootloader
+cd $BUILD_DIR
 printf "Creating Python venv for the installation of setuptools and pyelftools...\n"
 python3 -m venv forThePips
 source forThePips/bin/activate
@@ -52,10 +52,10 @@ unset BL31
 printf "Compiling the QEMU U-Boot binary for arm64...\n"
 make qemu_arm64_defconfig O=../qemu
 make CROSS_COMPILE=aarch64-buildroot-linux-gnu- O=../qemu
-cd $BUILD_DIR
 printf "Finished setting up U-Boot for QEMU and the RockPro board...\n"
 
 # Build kernel
+cd $BUILD_DIR
 printf "Creating manual/kernel/ modules and build_arm64 directories...\n"
 mkdir -p kernel/modules kernel/build_arm64
 cd kernel
@@ -74,10 +74,10 @@ make ARCH=arm64 dtbs CROSS_COMPILE=aarch64-buildroot-linux-gnu- O=../build_arm64
 printf "Compiling and installing the modules into the manual/kernel/modules directory...\n"
 make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-buildroot-linux-gnu- INSTALL_MOD_PATH=../modules O=../build_arm64
 make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-buildroot-linux-gnu- INSTALL_MOD_PATH=../modules O=../build_arm64 modules_install
-cd $BUILD_DIR
 printf "Finished compiling the Linux kernel, device tree, and modules...\n"
 
 # Build rootfs
+cd $BUILD_DIR
 printf "Creating the filesystem directory for coreutils and rootfs at manual/filesystem...\n"
 mkdir -p filesystem
 cd filesystem
@@ -96,10 +96,10 @@ printf "Copying the linux modules into manual/filesystem/rootfs/lib/modules...\n
 cp -a $BUILD_DIR/kernel/modules/lib/modules lib/
 printf "Removing the symlinked lib/modules/7.0.0-rc6wb-0.1 from the rootfs to prevent missing directory errors...\n"
 rm -r lib/modules/7.0.0-rc6wb-0.1/build
-cd $BUILD_DIR
 printf "Finished creating the rootfs...\n"
 
 # Build BusyBox (core utils)
+cd $BUILD_DIR
 printf "Cloning the BusyBox (1_38_0) source...\n"
 git clone git://busybox.net/busybox.git
 cd busybox
@@ -121,8 +121,22 @@ mkdir -p rootfs/usr/share/udhcpc
 cp busybox/examples/udhcp/simple.script rootfs/usr/share/udhcpc/default.script
 printf "Finished creating and installing BusyBox core-utils...\n"
 
+# Build DropBear SSH
+cd $BUILD_DIR
+git clone https://github.com/mkj/dropbear/blob/main/SMALL.md
+cd dropbear
+mkdir install_location
+./configure --disable-lastlog --disable-utmp --disable-utmpx --disable-wtmp --disable-wtmpx --enable-static --disable-zlib
+make PROGRAMS="dropbear dropbearkey" CROSS_COMPILE=aarch64-buildroot-linux-gnu- DESTDIR=$BUILD_DIR/dropbear/install_location install
+cp install_location/usr/local/bin/dropbearkey $BUILD_DIR/rootfs/bin/
+cp install_location/usr/local/sbin/dropbear $BUILD_DIR/rootfs/sbin/
+
+
+# Build SQLite
+cd $BUILD_DIR
+
 # Generate initramfs
-cd kernel
+cd $BUILD_DIR/kernel
 printf "Creating manual/kernel/ rockpro and qemu directories for each mkinitcpio...\n"
 mkdir -p rockpro qemu
 printf "Copying build_arm64/usr/gen_init_cpio into linux-stable/usr to prep for the initramfs generation...\n"
