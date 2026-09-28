@@ -79,10 +79,8 @@ printf "Finished compiling the Linux kernel, device tree, and modules...\n"
 # Build rootfs
 cd $BUILD_DIR
 printf "Creating the filesystem directory for coreutils and rootfs at manual/filesystem...\n"
-mkdir -p filesystem
-cd filesystem
-mkdir rootfs
-cd rootfs
+mkdir -p filesystem/rootfs
+cd filesystem/rootfs
 printf "Creating the skeleton directory structure for the root filesystem...\n"
 mkdir -p bin dev etc/init.d home lib proc sbin sys tmp usr/bin usr/lib usr/sbin var/log
 printf "Linking lib with lib64 in manual/filesystem/rootfs...\n"
@@ -112,28 +110,35 @@ printf "Compiling BusyBox..."
 make ARCH=arm64 CROSS_COMPILE=aarch64-buildroot-linux-gnu-
 printf "Installing BusyBox into manual/filesystem/rootfs...\n"
 make ARCH=arm64 CROSS_COMPILE=aarch64-buildroot-linux-gnu- install
-cd ..
+cd ../filesystem
 printf "SUDO REQUIRED: chown root:root and setuid root for the busybox binary in manual/filesystem/rootfs/usr/bin/busybox...\n"
 sudo chown root:root rootfs/bin/busybox
 sudo chmod u+s rootfs/bin/busybox
 printf "Moving udhcpc simple.script into rootfs usr/share/udhcpc/default.script..."
 mkdir -p rootfs/usr/share/udhcpc
-cp busybox/examples/udhcp/simple.script rootfs/usr/share/udhcpc/default.script
+cp ../busybox/examples/udhcp/simple.script rootfs/usr/share/udhcpc/default.script
 printf "Finished creating and installing BusyBox core-utils...\n"
 
-# Build DropBear SSH
+# Building Additional Apps
+printf "Building additional apps and header files (residing in manual/additional_apps)..."
 cd $BUILD_DIR
-git clone https://github.com/mkj/dropbear/blob/main/SMALL.md
+mkdir additional_apps
+# Build DropBear SSH
+printf "Cloning Dropbear SSH's repository from Github, compiling, and adding to filesystem/rootfs..."
+cd additional_apps
+git clone https://github.com/mkj/dropbear.git 
 cd dropbear
 mkdir install_location
-./configure --disable-lastlog --disable-utmp --disable-utmpx --disable-wtmp --disable-wtmpx --enable-static --disable-zlib
+./configure --host=aarch64-linux-gnu --disable-lastlog --disable-utmp --disable-utmpx --disable-wtmp --disable-wtmpx --enable-static --disable-zlib
 make PROGRAMS="dropbear dropbearkey" CROSS_COMPILE=aarch64-buildroot-linux-gnu- DESTDIR=$BUILD_DIR/dropbear/install_location install
-cp install_location/usr/local/bin/dropbearkey $BUILD_DIR/rootfs/bin/
-cp install_location/usr/local/sbin/dropbear $BUILD_DIR/rootfs/sbin/
-
-
+cp install_location/usr/local/bin/dropbearkey $BUILD_DIR/filesystem/rootfs/bin/
+cp install_location/usr/local/sbin/dropbear $BUILD_DIR/filesystem/rootfs/sbin/
 # Build SQLite
-cd $BUILD_DIR
+printf "Downloading SQLite Amalgamation headers..."
+cd $BUILD_DIR/additional_apps
+wget https://sqlite.org/snapshot/sqlite-snapshot-202607312245.tar.gz
+tar -xzf sqlite-snapshot-202607312245.tar.gz
+rm -rf sqlite-snapshot-202607312245.tar.gz
 
 # Generate initramfs
 cd $BUILD_DIR/kernel
