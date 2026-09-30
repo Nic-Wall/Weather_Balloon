@@ -45,13 +45,15 @@ export BL31=../trusted-firmware-a/build/rk3399/release/bl31/bl31.elf
 printf "Compiling the rockpro64-rk3399 U-Boot binary...\n"
 # Below is imported from manual_configs 
 #make rockpro64-rk3399_defconfig
-make CROSS_COMPILE=aarch64-buildroot-linux-gnu- O=../rockpro
+make CROSS_COMPILE=aarch64-buildroot-linux-gnu- O=../rockpro BL31=../trusted-firmware-a/build/rk3399/release/bl31/bl31.elf
 make mrproper
 printf "Removing the BL31 shell variable...\n"
 unset BL31
 printf "Compiling the QEMU U-Boot binary for arm64...\n"
 make qemu_arm64_defconfig O=../qemu
 make CROSS_COMPILE=aarch64-buildroot-linux-gnu- O=../qemu
+printf "Reading bootscript.txt from manual_configs and compiling it into a binary readable by u-boot...\n"
+$BUILD_DIR/bootloader/rockpro/tools/mkimage A=arm64 -O linux -T script -d $BUILD_DIR/../manual_configs/bootscript.txt boot.scr
 printf "Finished setting up U-Boot for QEMU and the RockPro board...\n"
 
 # Build kernel
@@ -126,11 +128,20 @@ mkdir additional_apps
 # Build DropBear SSH
 printf "Cloning Dropbear SSH's repository from Github, compiling, and adding to filesystem/rootfs..."
 cd additional_apps
+printf "Acquring libxcrypt for cross-compilation library providing `crypt()` as required by dropbear..."
+wget https://github.com/besser82/libxcrypt/releases/download/v4.5.2/libxcrypt-4.5.2.tar.xz
+tar -xf libxcrypt-4.5.2.tar.xz
+rm libxcrypt-4.5.2.tar.xz
+cd libxcrypt-4.5.2
+./configure --prefix=/usr --enable-static --disable-shared --disable-obsolete-api --host=aarch64-buildroot-linux-gnu CC=aarch64-buildroot-linux-gnu-gcc
+mkdir install_location
+make DESTDIR=$BUILD_DIR/additional_apps/libxcrypt-4.5.2/install_location/
+cd ..
 git clone https://github.com/mkj/dropbear.git 
 cd dropbear
 mkdir install_location
-./configure --host=aarch64-linux-gnu --disable-lastlog --disable-utmp --disable-utmpx --disable-wtmp --disable-wtmpx --enable-static --disable-zlib
-make PROGRAMS="dropbear dropbearkey" CROSS_COMPILE=aarch64-buildroot-linux-gnu- DESTDIR=$BUILD_DIR/dropbear/install_location install
+./configure --host=aarch64-linux-gnu --disable-lastlog --disable-utmp --disable-utmpx --disable-wtmp --disable-wtmpx --enable-static --disable-zlib CC=aarch64-buildroot-linux-gcc
+make PROGRAMS="dropbear dropbearkey" DESTDIR=$BUILD_DIR/additional_apps/dropbear/install_location install
 cp install_location/usr/local/bin/dropbearkey $BUILD_DIR/filesystem/rootfs/bin/
 cp install_location/usr/local/sbin/dropbear $BUILD_DIR/filesystem/rootfs/sbin/
 # Build SQLite

@@ -1,0 +1,5 @@
+fatload mmc 1:1 ${kernel_addr_r} Image;
+fatload mmc 1:1 ${ramdisk_addr_r} uRamdisk;
+fatload mmc 1:1 ${fdt_addr_r} rk3399-rockpro64.dtb;
+setenv bootargs 'root=/dev/mmcblk0p2 rdinit=/sbin/init rw';
+booti ${kernel_addr_r} ${ramdisk_addr_r}:${filesize} ${fdt_addr_r};
