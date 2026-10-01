@@ -1,0 +1,12 @@
+# Just making a list. Will version pin later
+bison
+libssl-dev
+bc
+swig
+git
+ca-certificates
+libncurses-dev
+wget
+pyhton3-dev
+python3-setuptools
+python3-pyelftools
