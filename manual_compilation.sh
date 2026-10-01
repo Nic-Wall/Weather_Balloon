@@ -8,12 +8,14 @@ cd $BUILD_DIR
 mkdir -p crossCompiler
 cd crossCompiler
 # Install the actual cross-compiling toolchain
-curl https://toolchains.bootlin.com/downloads/releases/toolchains/aarch64/tarballs/aarch64--glibc--stable-2025.08-1.tar.xz --output aarch64--glibc--stable-2025.08-1.tar.xz
+wget https://toolchains.bootlin.com/downloads/releases/toolchains/aarch64/tarballs/aarch64--glibc--stable-2025.08-1.tar.xz
 tar -xf aarch64--glibc--stable-2025.08-1.tar.xz
 export PATH="$PATH:$BUILD_DIR/crossCompiler/aarch64--glibc--stable-2025.08-1/bin/:$PATH"
 # Install the arm-none-eabi from ARM for the compilation of the M0 driver
-curl https://gitlab.arm.com/api/v4/projects/tooling%2Fgnu-toolchains-for-arm/packages/generic/gnu-toolchain/15.3.rel1/arm-gnu-toolchain-15.3.rel1-x86_64-arm-none-eabi.tar.xz --output arm-gnu-toolchain-15.3.rel1-x86_64-arm-none-eabi.tar.xz
+wget https://gitlab.arm.com/api/v4/projects/tooling%2Fgnu-toolchains-for-arm/packages/generic/gnu-toolchain/15.3.rel1/arm-gnu-toolchain-15.3.rel1-x86_64-arm-none-eabi.tar.xz
 tar -xf arm-gnu-toolchain-15.3.rel1-x86_64-arm-none-eabi.tar.xz
+rm aarch64--glibc--stable-2025.08-1.tar.xz
+rm arm-gnu-toolchain-15.3.rel1-x86_64-arm-none-eabi.tar.xz
 
 # Build bootloader
 cd $BUILD_DIR
