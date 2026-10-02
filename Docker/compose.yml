@@ -1,0 +1,8 @@
+name: weather_balloon
+services:
+  build_env:
+    image: nicholas/weather_balloon:local
+    build: ./
+    user: 1000:1000
+    volumes:
+      - ./:/WB
