@@ -4,5 +4,8 @@ services:
     image: nicholas/weather_balloon:local
     build: ./
     user: 1000:1000
+    stdin_open: true
+    tty: true
+    command: bash
     volumes:
       - ./:/WB

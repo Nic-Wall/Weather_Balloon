@@ -16,3 +16,4 @@ ca-certificates
 uuid-dev
 libgnutls28-dev
 tree
+make
