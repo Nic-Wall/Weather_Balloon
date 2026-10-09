@@ -4,28 +4,28 @@
 SRCS := ${CURDIR}/srcs
 DSTS := ${CURDIR}/dest
 TOOLCHAIN := aarch64--glibc--stable-2025.08-1/
-CROSS_COMPILE := $(SRC)/cross_compiler/$(TOOLCHAIN)/bin/aarch64-buildroot-linux-gnu-gcc
+CROSS_COMPILE := $(SRCS)/cross_compiler/$(TOOLCHAIN)/bin/aarch64-buildroot-linux-gnu-
 
 # Functions
-define file_fetch
+define source_fetch
 	@# https://stackoverflow.com/questions/6783243/functions-in-makefiles
 	@# https://stackoverflow.com/questions/16675179/how-to-use-sed-to-extract-substring
-	@# 1 = Link used to fetch the file
-	@# 2 = SHASUM to compare to
-	@# 3 = DIR Location
-	$(eval $@_LINK_SUBSTRING) = ${echo $1 | grep -Po '[^\/]+?(?=\.tar\.)'}
-	mkdir -p $(SRCS)/${$@_LINK_SUBSTRING}/
-	wget $(1) -O $(SRCS)/${$@_LINK_SUBSTRING} | shasum -a 256 -c -
-endef
+	@# $(call source_fetch,URL,SHASUM/Revision,dest_dir,tarball/git)
+	@# Tarball (1) or git (2)
+	${$@_LINK_SUBSTRING} = $(basename $(notdir $1))
+	mkdir -p $(3)/${$@_LINK_SUBSTRING}/
+	ifeq ($(4),1)
+		mkdir -p $(3)/${$@_LINK_SUBSTRING}/
+		wget $(1) -O $(3)/${$@_LINK_SUBSTRING}/
+		echo "$(2)  $(3)/${notdir $1}" | shasum -a 256 -c -
+		tar -xf $(3)/$(notdir $1) -C $(3)/${$@_LINK_SUBSTRING}/
+	endif
+	ifeq ($(4),2)
+		mkdir -p $(3)/${$@_LINK_SUBSTRING}/
+		git clone --depth=1 $(1) $(3)/${$@_LINK_SUBSTRING}/
+		cd $(3)/${$@_LINK_SUBSTRING}/ && git -C fetch --depth 1 origin $(2) && git checkout -q --detatch FETCH_HEAD
+	endif
 
-define git_fetch
-	@# 1 = Git link used to clone the repository
-	@# 2 = Revision requested
-	@# 3 = Depth
-        @# 4 = DIR Location
-	$(eval $@_LINK_SUBSTRING) = ${echo $1 | grep -Po '[^\/]+?(?=\.git)'}
-	mkdir -p $(4)/${$@_LINK_SUBSTRING}/
-	git clone --revision $(2) --depth=$(3) $(1) $(4)/${$@_LINK_SUBSTRING}/
 endef
 
 .PHONY: fetch
@@ -37,8 +37,8 @@ NONE_EABI_URL := https://gitlab.arm.com/api/v4/projects/tooling%2Fgnu-toolchains
 NONE_EABI_SHASUM := 563bebb2b97d53382b956d6ee1fe61e2cae26699901417234a37df505ef9b5fa
 $(SRCS)/.toolchain:
 	mkdir -p $(SRCS)/cross_compiler
-	$(call file_fetch,$(TC_URL),$(TC_SHASUM),"$(SRCS)/cross_compiler")
-	$(call file_fetch,$(NONE_EABI_URL),$(NONE_EABI_SHASUM),"$(SRCS)/cross_Compiler")
+	$(call source_fetch,$(TC_URL),$(TC_SHASUM),"$(SRCS)/cross_compiler",1)
+	$(call source_fetch,$(NONE_EABI_URL),$(NONE_EABI_SHASUM),"$(SRCS)/cross_Compiler",1)
 	touch $@
 
 TFA_URL := https://github.com/TrustedFirmware-A/trusted-firmware-a.git
@@ -47,8 +47,8 @@ UBOOT_URL := https://source.denx.de/u-boot/u-boot.git
 UBOOT_SHASUM := 4f70106beafe30df8b0528a3d8b2543cd48fe241
 $(SRCS)/.bootloader:
 	mkdir -p $(SRCS)/bootloader
-	$(call git_fetch,$(TFA_URL),$(TFA_SHASUM),"$(SRCS)/bootloader")
-	$(call git_fetch,$(UBOOT_URL),$(UBOOT_SHASUM),"$(SRCS)/bootloader")
+	$(call source_fetch,$(TFA_URL),$(TFA_SHASUM),"$(SRCS)/bootloader",2)
+	$(call source_fetch,$(UBOOT_URL),$(UBOOT_SHASUM),"$(SRCS)/bootloader",2)
 	touch $@
 
 # GIT
