@@ -6,3 +6,12 @@ qemu/
 
 # Custom Obsidian JSON
 Docs/.obsidian/
+
+# Everything fetched in srcs except the rootfs skeleton and configs directories
+Docker/srcs/*
+!Docker/srcs/configs
+!Docker/srcs/rfs_skeleton
+
+# Everything in dsts except the .empty used to keep the directory as pullable in git clone
+Docker/dsts/*
+!Docker/dsts/.empty
