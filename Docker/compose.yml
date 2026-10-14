@@ -9,3 +9,4 @@ services:
     command: bash
     volumes:
       - ./:/WB
+    network_mode: "host"

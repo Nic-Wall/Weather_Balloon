@@ -17,3 +17,5 @@ uuid-dev
 libgnutls28-dev
 tree
 make
+libcrypt1
+xz-utils

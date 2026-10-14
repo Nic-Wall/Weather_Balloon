@@ -7,8 +7,7 @@ define file_fetch
 	mkdir -p $(3)
 	wget -c -P $(3) $(1)
 	echo "$(2)  $(3)/$(notdir $(1))" | shasum -a 256 -c -
-	mkdir -p $(3)/$(basename $(basename $(notdir $(1))))
-	tar -xf $(3)/$(notdir $(1)) -C $(3)/$(basename $(basename $(notdir $(1))))
+	tar -xf $(3)/$(notdir $(1)) -C $(3)/
 endef
 
 # $(call git_fetch,URL,Revision,Dest_Dir)
@@ -24,7 +23,7 @@ endef
 
 # General Rules
 SRCS = ${CURDIR}/srcs
-DSTS = ${CURDIR}/dest
+DSTS = ${CURDIR}/dsts
 TOOLCHAIN = aarch64--glibc--stable-2025.08-1
 arm_none_eabi = arm-gnu-toolchain-15.3.rel1-x86_64-arm-none-eabi
 CROSS_COMPILE = $(SRCS)/cross_compiler/$(TOOLCHAIN)/bin/aarch64-buildroot-linux-gnu-
@@ -63,46 +62,51 @@ $(SRCS)/.kernel:
 	touch $@
 
 # BusyBox
-BUSYBOX_URL = https://busybox.net/busybox.git
+BUSYBOX_URL = git://busybox.net/busybox.git
 BUSYBOX_SHASUM = ead17e7808236be80614d0a8755f4ddad63ab56c
 $(SRCS)/.busybox:
 	$(call git_fetch,$(BUSYBOX_URL),$(BUSYBOX_SHASUM),$(SRCS)/additional_apps)
 	touch $@
 
 # SQLite
-SQLITE_URL =
-SQLITE_SHASUM = 1ffe6567e8986c0d3bd0384e6a1b3baefab6af51
+SQLITE_URL = https://sqlite.org/2026/sqlite-autoconf-3540000.tar.gz
+SQLITE_SHASUM = 134ec0802dda5795816e25d25872d20b312cb3973438c49b30bc40b7705ea9ed
 $(SRCS)/.sqlite:
-	$(call git_fetch,$(SQLITE_URL),$(SQLITE_SHASUM),$(SRCS)/additional_apps)
+	$(call file_fetch,$(SQLITE_URL),$(SQLITE_SHASUM),$(SRCS)/additional_apps)
 	touch $@
 
 # Dropbear SSH
-LIBXCRYPT_URL = https://github.com/besser82/libxcrypt/releases/download/v4.5.2/libxcrypt-4.5.2.tar.xz
-LIBXCRYPT_SHASUM = 71513a31c01a428bccd5367a32fd95f115d6dac50fb5b60c779d5c7942aec071
+#LIBXCRYPT_URL = https://github.com/besser82/libxcrypt/releases/download/v4.5.2/libxcrypt-4.5.2.tar.xz
+#LIBXCRYPT_SHASUM = 71513a31c01a428bccd5367a32fd95f115d6dac50fb5b60c779d5c7942aec071
 DROPBEAR_URL = https://github.com/mkj/dropbear.git 
 DROPBEAR_SHASUM = 59870ad43153fe8d4f1c96f5d5752116c94f31ff
 $(SRCS)/.dropbear:
-	$(call file_fetch,$(LIBXCRYPT_URL),$(LIBXCRYPT_SHASUM),$(SRCS)/additional_apps)
 	$(call git_fetch,$(DROPBEAR_URL),$(DROPBEAR_SHASUM),$(SRCS)/additional_apps)
 	touch $@
 
-bootloader: 
-$(SRCS)/bootloader/trusted-firmware-a/build/rk3399/release/bl31/bl31.elf:
+BL31_ELF = $(SRCS)/bootloader/trusted-firmware-a/build/rk3399/release/bl31/bl31.elf
+ROCKPRO_UBOOT_CONFIG = $(SRCS)/configs/bootloader/rockpro_uboot.config
+QEMU_UBOOT_CONFIG = $(SRCS)/configs/bootloader/qemu_uboot.config
+ROCKPRO_DTB = $(DSTS)/bootloader/rockpro/dts/upstream/src/arm64/rockchip/rk3399-rockpro64.dtb
+QEMU_DTB = $(DSTS)/bootloader/qemu/dts/dt.dtb
+bootloader: $(BL31_ELF) $(ROCKPRO_DTB) $(QEMU_DTB) $(DSTS)/bootloader/boot.scr
+$(BL31_ELF): $(SRCS)/.bootloader
 	cd bootloader/trusted-firmware-a && $(MAKE) distclean && $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) PLAT=rk3399 M0_CROSS_COMPILE=$(arm_none_eabi_bin)
-$(SRCS)/configs/bootloader/rockpro_uboot.config: $(SRCS)/bootloader/trusted-firmware-a/build/rk3399/release/bl31/bl31.elf
+$(ROCKPRO_DTB): $(BL31_ELF) $(SRCS)/.bootloader
 	mkdir -p $(DSTS)/bootloader/rockpro
-	cp $(SRCS)/configs/bootloader/rockpro_uboot.config $(DSTS)/bootloader/rockpro/.config
+	cp $(ROCKPRO_UBOOT_CONFIG) $(DSTS)/bootloader/rockpro/.config
 	cd bootloader/u-boot && $(MAKE) mrproper && $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) O=$(DSTS)/bootloader/rockpro BL31=../trusted-firmware-a/build/rk3399/release/bl31/bl31.elf
-$(SRCS)/configs/bootloader/qemu_uboot.config:
+$(QEMU_DTB): $(SRCS)/.bootloader
 	mkdir -p $(DSTS)bootloader/qemu
-	cp $(SRCS)/configs/bootloader/qemu_uboot.config $(DSTS)/bootloader/qemu/.config
+	cp $(QEMU_UBOOT_CONFIG) $(DSTS)/bootloader/qemu/.config
 	cd bootloader/u-boot && $(MAKE) mrproper && $(MAKE) qemu_arm64_defconfig O=$(DSTS)/bootloader/qemu
-$(SRCS)/configs/bootloader/bootscript.txt:
+$(DSTS)/bootloader/boot.scr: $(SRCS)/configs/bootloader/bootscript.txt
 	$(SRCS)/bootloader/rockpro/tools/mkimage A=arm64 -O linux -T script -d $(SRCS)/configs/bootloader/bootscript.txt $(DSTS)/bootloader/boot.scr
 	
-kernel:
+BUILD = 7.0.0-rc6wb-0.1
+kernel: $(KERNEL_BUILD_DSTS)/modules/lib/modules/$(BUILD)/modules.dep
 KERNEL_BUILD_DSTS = $(DSTS)/kernel/build_arm64
-$(SRCS)/configs/rockpro_kernel.config:
+$(KERNEL_BUILD_DSTS)/modules/lib/modules/$(BUILD)/modules.dep: $(SRCS)/.kernel
 	mkdir -p $(DSTS)/kernel/modules $(DSTS)/kernel/build_arm64
 	cp $(SRCS)/configs/rockpro_kernel.config $(KERNEL_BUILD_DSTS)/.config
 	cd $(SRCS)/linux-stable/ && $(MAKE) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) O=$(KERNEL_BUILD_DSTS) prepare
@@ -111,10 +115,9 @@ $(SRCS)/configs/rockpro_kernel.config:
 	cd $(SRCS)/linux-stable/ && $(MAKE) -j$(shell nproc) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) INSTALL_MOD_PATH=$(DSTS)/kernel/modules O=$(KERNEL_BUILD_DSTS)
 	cd $(SRCS)/linux-stable/ && $(MAKE) -j$(shell nproc) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) INSTALL_MOD_PATH=$(DSTS)/kernel/modules O=$(KERNEL_BUILD_DSTS) modules_install
 
-RFS = $(DSTS)/rootfs
-BUILD = 7.0.0-rc6wb-0.1
+RFS = $(DSTS)/rfs
 rootfs:
-$(SRCS)/.rootfs:
+$(SRCS)/.rootfs: $(KERNEL_BUILD_DSTS)/modules/lib/modules/$(BUILD)/modules.dep
 	mkdir -p $(RFS)/bin $(RFS)/dev $(RFS)/etc/init.d $(RFS)/home $(RFS)/lib $(RFS)/proc $(RFS)/sbin $(RFS)/sys $(RFS)/tmp $(RFS)/usr/bin $(RFS)/usr/lib $(RFS)/usr/sbin $(RFS)/var/log
 	cd $(RFS) && ln -s lib lib64
 	cp -r $(SRCS)/rfs_skeleton/* $(RFS)/etc/
@@ -124,18 +127,30 @@ $(SRCS)/.rootfs:
 	rm -r $(RFS)/lib/modules/$(BUILD)/build
 	touch $@
 
-apps = $(DSTS)/additional_apps
+APP_DSTS = $(DSTS)/additional_apps
 additional_apps:
-# NEED LIBXCRYPT AS DEPENDS FOR DROPBEAR
-$(RFS)/sbin/dropbear:
-
-# NEED SQLite HEADERS HERE
+$(RFS)/sbin/dropbear: $(SRCS)/.dropbear $(SRCS)/.rootfs
+	mkdir $(APP_DSTS)/dropbear
+	cd $(SRCS)/additional_apps/dropbear && ./configure --host=aarch64-linux-gnu --disable-lastlog --disable-utmp --disable-utmpx --disable-wtmp --disable-wtmpx --enable-static --disable-zlib CROSS_COMPILE=$(CROSS_COMPILE)
+	cd $(SRCS)/additional_apps/dropear && $(MAKE) PROGRAMS="dropbear dropbearkey" DESTDIR=$(APP_DSTS)/dropbear install
+	cp  $(APP_DSTS)/dropbear/usr/local/sbin/dropbear $(RFS)/sbin/dropbear
+	cp $(APP_DSTS)/dropbear/usr/local/bin/dropbearkey $(RFS)/bin/dropbearkey
+$(RFS)/bin/busybox: 
+# NEED SQLite Headers
 
 # https://stackoverflow.com/questions/25005637/makefile-rule-depend-on-directory-content-changes
-RFS_DIRS = $(shell find $(SRCS)/rootfs/ -type d)
-RFS_FILES = $(shell find $(SRCS)/rootfs/ -type f -name '*')
+RFS_DIRS = $(shell find $(RFS) -type d)
+RFS_FILES = $(shell find $(RFS) -type f -name '*')
 gen_initramfs: $(DSTS)/kernel/build_arm64/arch/arm64/boot/Image $(DSTS)/kernel/rockpro/uRamdisk
-$(DSTS)/kernel/build_arm64/arch/arm64/boot/Image: $(KERNEL_BUILD_DSTS)/Image.gz $(RFS_DIRS) $(RFS_FILES)
+$(KERNEL_BUILD_DSTS)/initramfs.cpio.gz: $(KERNEL_BUILD_DSTS)/usr/gen_init_cpio $(RFS_DIRS) $(RFS_FILES)
+	mkdir -p $(DSTS)/kernel/rockpro $(DSTS)/kernel/qemu
+	cp $(KERNEL_BUILD_DSTS)/usr/gen_init_cpio $(SRCS)/linux-stable/usr
+	$(shell $(SRCS)/linux-stable/usr/gen_initramfs.sh -o $(KERNEL_BUILD_DSTS)/initramfs.cpio -u 1000 -g 1000 $(RFS))
+	gzip $(KERNEL_BUILD_DSTS)/initramfs.cpio
 $(DSTS)/kernel/rockpro/uRamdisk: $(DSTS)/kernel/build_arm64/initramfs.cpio.gz
+	cp $(KERNEL_BUILD_DSTS)/initramfs.cpio.gz $(DSTS)/kernel/rockpro/
+	cp $(KERNEL_BUILD_DSTS)/initramfs.cpio.gz $(DSTS)/kernel/qemu/
+	$(shell $(SRCS)/bootloader/rockpro/tools/mkimage -A arm64 -O linux -T ramdisk -d $(KERNEL_BUILD_DSTS)/initramfs.cpio.gz $(DSTS)/kernel/rockpro/uRamdisk)
+	$(shell $(SRCS)/bootloader/qemu/tools/mkimage -A arm64 -O linux -T ramdisk -d $(KERNEL_BUILD_DSTS)/initramfs.cpio.gz $(DSTS)/kernel/qemu/uRamdisk)
 
 clean:
