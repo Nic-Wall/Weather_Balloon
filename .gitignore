@@ -14,4 +14,4 @@ Docker/srcs/*
 
 # Everything in dsts except the .empty used to keep the directory as pullable in git clone
 Docker/dsts/*
-!Docker/dsts/.empty
+!Docker/dsts/rfs/.rfs_make_tracker
