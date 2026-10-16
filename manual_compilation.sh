@@ -58,7 +58,7 @@ printf "Compiling the QEMU U-Boot binary for arm64...\n"
 make qemu_arm64_defconfig O=../qemu
 make CROSS_COMPILE=aarch64-buildroot-linux-gnu- O=../qemu
 printf "Reading bootscript.txt from manual_configs and compiling it into a binary readable by u-boot...\n"
-$BUILD_DIR/bootloader/rockpro/tools/mkimage A=arm64 -O linux -T script -d $BUILD_DIR/../manual_configs/bootscript.txt boot.scr
+$BUILD_DIR/bootloader/rockpro/tools/mkimage -A arm64 -O linux -T script -d $BUILD_DIR/../manual_configs/bootscript.txt boot.scr
 printf "Finished setting up U-Boot for QEMU and the RockPro board...\n"
 
 # Build kernel

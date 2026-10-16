@@ -88,20 +88,21 @@ BL31_ELF = $(SRCS)/bootloader/trusted-firmware-a/build/rk3399/release/bl31/bl31.
 ROCKPRO_UBOOT_CONFIG = $(SRCS)/configs/bootloader/rockpro_uboot.config
 QEMU_UBOOT_CONFIG = $(SRCS)/configs/bootloader/qemu_uboot.config
 ROCKPRO_DTB = $(DSTS)/bootloader/rockpro/dts/upstream/src/arm64/rockchip/rk3399-rockpro64.dtb
-QEMU_DTB = $(DSTS)/bootloader/qemu/dts/dt.dtb
-bootloader: $(BL31_ELF) $(ROCKPRO_DTB) $(QEMU_DTB) $(DSTS)/bootloader/boot.scr
+ROCKPRO_MKIMAGE = $(DSTS)/bootloader/rockpro/tools/mkimage
+QEMU_UBOOT_BIN = $(DSTS)/bootloader/qemu/u-boot.bin
+bootloader: $(BL31_ELF) $(ROCKPRO_DTB) $(QEMU_UBOOT_BIN) $(DSTS)/bootloader/boot.scr
 $(BL31_ELF): $(SRCS)/.bootloader
-	cd bootloader/trusted-firmware-a && $(MAKE) distclean && $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) PLAT=rk3399 M0_CROSS_COMPILE=$(arm_none_eabi_bin)
+	cd $(SRCS)/bootloader/trusted-firmware-a && $(MAKE) distclean && $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) PLAT=rk3399 M0_CROSS_COMPILE=$(arm_none_eabi_bin)
 $(ROCKPRO_DTB): $(BL31_ELF) $(SRCS)/.bootloader
 	mkdir -p $(DSTS)/bootloader/rockpro
 	cp $(ROCKPRO_UBOOT_CONFIG) $(DSTS)/bootloader/rockpro/.config
-	cd bootloader/u-boot && $(MAKE) mrproper && $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) O=$(DSTS)/bootloader/rockpro BL31=../trusted-firmware-a/build/rk3399/release/bl31/bl31.elf
-$(QEMU_DTB): $(SRCS)/.bootloader
-	mkdir -p $(DSTS)bootloader/qemu
+	cd $(SRCS)/bootloader/u-boot && $(MAKE) mrproper && $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) O=$(DSTS)/bootloader/rockpro BL31=$(BL31_ELF)
+$(QEMU_UBOOT_BIN): $(SRCS)/.bootloader
+	mkdir -p $(DSTS)/bootloader/qemu
 	cp $(QEMU_UBOOT_CONFIG) $(DSTS)/bootloader/qemu/.config
-	cd bootloader/u-boot && $(MAKE) mrproper && $(MAKE) qemu_arm64_defconfig O=$(DSTS)/bootloader/qemu
-$(DSTS)/bootloader/boot.scr: $(SRCS)/configs/bootloader/bootscript.txt
-	$(SRCS)/bootloader/rockpro/tools/mkimage A=arm64 -O linux -T script -d $(SRCS)/configs/bootloader/bootscript.txt $(DSTS)/bootloader/boot.scr
+	cd $(SRCS)/bootloader/u-boot && $(MAKE) mrproper && $(MAKE) qemu_arm64_defconfig O=$(DSTS)/bootloader/qemu && make CROSS_COMPILE=$(CROSS_COMPILE) O=$(DSTS)/bootloader/qemu
+$(DSTS)/bootloader/boot.scr: $(SRCS)/configs/bootloader/bootscript.txt $(ROCKPRO_MKIMAGE)
+	$(ROCKPRO_MKIMAGE) -A arm64 -O linux -T script -d $(SRCS)/configs/bootloader/bootscript.txt $(DSTS)/bootloader/boot.scr
 	
 BUILD = 7.0.0-rc6wb-0.1
 kernel: $(KERNEL_BUILD_DSTS)/modules/lib/modules/$(BUILD)/modules.dep
