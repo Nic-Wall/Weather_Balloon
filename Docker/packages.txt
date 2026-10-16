@@ -19,3 +19,4 @@ tree
 make
 libcrypt1
 xz-utils
+kmod

@@ -28,6 +28,7 @@ TOOLCHAIN = aarch64--glibc--stable-2025.08-1
 arm_none_eabi = arm-gnu-toolchain-15.3.rel1-x86_64-arm-none-eabi
 CROSS_COMPILE = $(SRCS)/cross_compiler/$(TOOLCHAIN)/bin/aarch64-buildroot-linux-gnu-
 arm_none_eabi_bin = $(SRCS)/cross_compiler/$(arm_none_eabi)/bin/arm-none-eabi-
+NPROC = $(shell nproc)
 
 # Targets
 .PHONY: all clean fetch
@@ -92,29 +93,30 @@ ROCKPRO_MKIMAGE = $(DSTS)/bootloader/rockpro/tools/mkimage
 QEMU_UBOOT_BIN = $(DSTS)/bootloader/qemu/u-boot.bin
 bootloader: $(BL31_ELF) $(ROCKPRO_DTB) $(QEMU_UBOOT_BIN) $(DSTS)/bootloader/boot.scr
 $(BL31_ELF): $(SRCS)/.bootloader
-	cd $(SRCS)/bootloader/trusted-firmware-a && $(MAKE) distclean && $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) PLAT=rk3399 M0_CROSS_COMPILE=$(arm_none_eabi_bin)
+	cd $(SRCS)/bootloader/trusted-firmware-a && $(MAKE) distclean && $(MAKE) -j$(NPROC) CROSS_COMPILE=$(CROSS_COMPILE) PLAT=rk3399 M0_CROSS_COMPILE=$(arm_none_eabi_bin)
 $(ROCKPRO_DTB): $(BL31_ELF) $(SRCS)/.bootloader
 	mkdir -p $(DSTS)/bootloader/rockpro
 	cp $(ROCKPRO_UBOOT_CONFIG) $(DSTS)/bootloader/rockpro/.config
-	cd $(SRCS)/bootloader/u-boot && $(MAKE) mrproper && $(MAKE) CROSS_COMPILE=$(CROSS_COMPILE) O=$(DSTS)/bootloader/rockpro BL31=$(BL31_ELF)
+	cd $(SRCS)/bootloader/u-boot && $(MAKE) mrproper && $(MAKE) -j$(NPROC) CROSS_COMPILE=$(CROSS_COMPILE) O=$(DSTS)/bootloader/rockpro BL31=$(BL31_ELF)
 $(QEMU_UBOOT_BIN): $(SRCS)/.bootloader
 	mkdir -p $(DSTS)/bootloader/qemu
 	cp $(QEMU_UBOOT_CONFIG) $(DSTS)/bootloader/qemu/.config
-	cd $(SRCS)/bootloader/u-boot && $(MAKE) mrproper && $(MAKE) qemu_arm64_defconfig O=$(DSTS)/bootloader/qemu && make CROSS_COMPILE=$(CROSS_COMPILE) O=$(DSTS)/bootloader/qemu
+	cd $(SRCS)/bootloader/u-boot && $(MAKE) mrproper && $(MAKE) -j$(NPROC) qemu_arm64_defconfig O=$(DSTS)/bootloader/qemu && make CROSS_COMPILE=$(CROSS_COMPILE) O=$(DSTS)/bootloader/qemu
 $(DSTS)/bootloader/boot.scr: $(SRCS)/configs/bootloader/bootscript.txt $(ROCKPRO_MKIMAGE)
 	$(ROCKPRO_MKIMAGE) -A arm64 -O linux -T script -d $(SRCS)/configs/bootloader/bootscript.txt $(DSTS)/bootloader/boot.scr
 	
 BUILD = 7.0.0-rc6wb-0.1
-kernel: $(KERNEL_BUILD_DSTS)/modules/lib/modules/$(BUILD)/modules.dep
+kernel: $(DSTS)/kernel/modules/lib/modules/$(BUILD)/modules.dep
 KERNEL_BUILD_DSTS = $(DSTS)/kernel/build_arm64
-$(KERNEL_BUILD_DSTS)/modules/lib/modules/$(BUILD)/modules.dep: $(SRCS)/.kernel
-	mkdir -p $(DSTS)/kernel/modules $(DSTS)/kernel/build_arm64
+LINUX_STABLE = $(SRCS)/kernel/linux-stable
+$(DSTS)/kernel/modules/lib/modules/$(BUILD)/modules.dep: $(SRCS)/.kernel
+	mkdir -p $(DSTS)/kernel/modules $(KERNEL_BUILD_DSTS)
 	cp $(SRCS)/configs/rockpro_kernel.config $(KERNEL_BUILD_DSTS)/.config
-	cd $(SRCS)/linux-stable/ && $(MAKE) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) O=$(KERNEL_BUILD_DSTS) prepare
-	cd $(SRCS)/linux-stable/ && $(MAKE) -j$(shell nproc) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) Image.gz O=$(KERNEL_BUILD_DSTS)
-	cd $(SRCS)/linux-stable/ && $(MAKE) -j$(shell nproc) ARCH=arm64 dtbs CROSS_COMPILE=$(CROSS_COMPILE) O=$(KERNEL_BUILD_DSTS)
-	cd $(SRCS)/linux-stable/ && $(MAKE) -j$(shell nproc) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) INSTALL_MOD_PATH=$(DSTS)/kernel/modules O=$(KERNEL_BUILD_DSTS)
-	cd $(SRCS)/linux-stable/ && $(MAKE) -j$(shell nproc) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) INSTALL_MOD_PATH=$(DSTS)/kernel/modules O=$(KERNEL_BUILD_DSTS) modules_install
+	cd $(LINUX_STABLE) && $(MAKE) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) O=$(KERNEL_BUILD_DSTS) prepare
+	cd $(LINUX_STABLE) && $(MAKE) -j$(NPROC) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) Image.gz O=$(KERNEL_BUILD_DSTS)
+	cd $(LINUX_STABLE) && $(MAKE) -j$(NPROC) ARCH=arm64 dtbs CROSS_COMPILE=$(CROSS_COMPILE) O=$(KERNEL_BUILD_DSTS)
+	cd $(LINUX_STABLE) && $(MAKE) -j$(NPROC) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) INSTALL_MOD_PATH=$(DSTS)/kernel/modules O=$(KERNEL_BUILD_DSTS)
+	cd $(LINUX_STABLE) && $(MAKE) -j$(NPROC) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) INSTALL_MOD_PATH=$(DSTS)/kernel/modules O=$(KERNEL_BUILD_DSTS) modules_install
 
 RFS = $(DSTS)/rfs
 rootfs:
@@ -133,7 +135,7 @@ additional_apps:
 $(RFS)/sbin/dropbear: $(SRCS)/.dropbear $(SRCS)/.rootfs
 	mkdir $(APP_DSTS)/dropbear
 	cd $(SRCS)/additional_apps/dropbear && ./configure --host=aarch64-linux-gnu --disable-lastlog --disable-utmp --disable-utmpx --disable-wtmp --disable-wtmpx --enable-static --disable-zlib CROSS_COMPILE=$(CROSS_COMPILE)
-	cd $(SRCS)/additional_apps/dropear && $(MAKE) PROGRAMS="dropbear dropbearkey" DESTDIR=$(APP_DSTS)/dropbear install
+	cd $(SRCS)/additional_apps/dropear && $(MAKE) -j$(NPROC) PROGRAMS="dropbear dropbearkey" DESTDIR=$(APP_DSTS)/dropbear install
 	cp  $(APP_DSTS)/dropbear/usr/local/sbin/dropbear $(RFS)/sbin/dropbear
 	cp $(APP_DSTS)/dropbear/usr/local/bin/dropbearkey $(RFS)/bin/dropbearkey
 $(RFS)/bin/busybox: 
