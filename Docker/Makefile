@@ -106,21 +106,24 @@ $(DSTS)/bootloader/boot.scr: $(SRCS)/configs/bootloader/bootscript.txt $(ROCKPRO
 	$(ROCKPRO_MKIMAGE) -A arm64 -O linux -T script -d $(SRCS)/configs/bootloader/bootscript.txt $(DSTS)/bootloader/boot.scr
 	
 BUILD = 7.0.0-rc6wb-0.1
-kernel: $(DSTS)/kernel/modules/lib/modules/$(BUILD)/modules.dep
+IMAGE: $(DSTS)/kernel/build_arm64/arch/arm64/boot/Image
+DTBS: $(DSTS)/kernel/build_arm64/arch/arm64/boot/dts/.dtbs-list.cmd
+
 KERNEL_BUILD_DSTS = $(DSTS)/kernel/build_arm64
 LINUX_STABLE = $(SRCS)/kernel/linux-stable
-$(DSTS)/kernel/modules/lib/modules/$(BUILD)/modules.dep: $(SRCS)/.kernel
+$(IMAGE): $(SRCS)/.kernel
 	mkdir -p $(DSTS)/kernel/modules $(KERNEL_BUILD_DSTS)
 	cp $(SRCS)/configs/rockpro_kernel.config $(KERNEL_BUILD_DSTS)/.config
 	cd $(LINUX_STABLE) && $(MAKE) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) O=$(KERNEL_BUILD_DSTS) prepare
 	cd $(LINUX_STABLE) && $(MAKE) -j$(NPROC) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) Image.gz O=$(KERNEL_BUILD_DSTS)
+$(DTBS): $(IMAGE)
 	cd $(LINUX_STABLE) && $(MAKE) -j$(NPROC) ARCH=arm64 dtbs CROSS_COMPILE=$(CROSS_COMPILE) O=$(KERNEL_BUILD_DSTS)
 	cd $(LINUX_STABLE) && $(MAKE) -j$(NPROC) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) INSTALL_MOD_PATH=$(DSTS)/kernel/modules O=$(KERNEL_BUILD_DSTS)
 	cd $(LINUX_STABLE) && $(MAKE) -j$(NPROC) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) INSTALL_MOD_PATH=$(DSTS)/kernel/modules O=$(KERNEL_BUILD_DSTS) modules_install
 
 RFS = $(DSTS)/rfs
-rootfs:
-$(SRCS)/.rootfs: $(KERNEL_BUILD_DSTS)/modules/lib/modules/$(BUILD)/modules.dep
+rootfs: $(SRCS)/.rootfs
+$(SRCS)/.rootfs: $(IMAGE)
 	mkdir -p $(RFS)/bin $(RFS)/dev $(RFS)/etc/init.d $(RFS)/home $(RFS)/lib $(RFS)/proc $(RFS)/sbin $(RFS)/sys $(RFS)/tmp $(RFS)/usr/bin $(RFS)/usr/lib $(RFS)/usr/sbin $(RFS)/var/log
 	cd $(RFS) && ln -s lib lib64
 	cp -r $(SRCS)/rfs_skeleton/* $(RFS)/etc/
@@ -144,7 +147,7 @@ $(RFS)/bin/busybox:
 # https://stackoverflow.com/questions/25005637/makefile-rule-depend-on-directory-content-changes
 RFS_DIRS = $(shell find $(RFS) -type d)
 RFS_FILES = $(shell find $(RFS) -type f -name '*')
-gen_initramfs: $(DSTS)/kernel/build_arm64/arch/arm64/boot/Image $(DSTS)/kernel/rockpro/uRamdisk
+gen_initramfs: $(IMAGE) $(DSTS)/kernel/rockpro/uRamdisk
 $(KERNEL_BUILD_DSTS)/initramfs.cpio.gz: $(KERNEL_BUILD_DSTS)/usr/gen_init_cpio $(RFS_DIRS) $(RFS_FILES)
 	mkdir -p $(DSTS)/kernel/rockpro $(DSTS)/kernel/qemu
 	cp $(KERNEL_BUILD_DSTS)/usr/gen_init_cpio $(SRCS)/linux-stable/usr
