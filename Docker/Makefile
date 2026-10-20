@@ -85,45 +85,65 @@ $(SRCS)/.dropbear:
 	$(call git_fetch,$(DROPBEAR_URL),$(DROPBEAR_SHASUM),$(SRCS)/additional_apps)
 	touch $@
 
+BL31 = $(DSTS)/.rk3399_bl3
+RK3399_UBOOT_BIN = $(DSTS)/.rk3399_dtb
+QEMU_UBOOT_BIN = $(DSTS)/.qemu_bin
 BL31_ELF = $(SRCS)/bootloader/trusted-firmware-a/build/rk3399/release/bl31/bl31.elf
-ROCKPRO_UBOOT_CONFIG = $(SRCS)/configs/bootloader/rockpro_uboot.config
-QEMU_UBOOT_CONFIG = $(SRCS)/configs/bootloader/qemu_uboot.config
 ROCKPRO_DTB = $(DSTS)/bootloader/rockpro/dts/upstream/src/arm64/rockchip/rk3399-rockpro64.dtb
 ROCKPRO_MKIMAGE = $(DSTS)/bootloader/rockpro/tools/mkimage
-QEMU_UBOOT_BIN = $(DSTS)/bootloader/qemu/u-boot.bin
-bootloader: $(BL31_ELF) $(ROCKPRO_DTB) $(QEMU_UBOOT_BIN) $(DSTS)/bootloader/boot.scr
-$(BL31_ELF): $(SRCS)/.bootloader
+bootloader: $(BL31) $(RK3399_UBOOT_BIN) $(DSTS)/bootloader/boot.scr
+$(BL31): $(SRCS)/.bootloader
 	cd $(SRCS)/bootloader/trusted-firmware-a && $(MAKE) distclean && $(MAKE) -j$(NPROC) CROSS_COMPILE=$(CROSS_COMPILE) PLAT=rk3399 M0_CROSS_COMPILE=$(arm_none_eabi_bin)
-$(ROCKPRO_DTB): $(BL31_ELF) $(SRCS)/.bootloader
+	touch $@
+$(RK3399_UBOOT_BIN): $(BL31) $(SRCS)/.bootloader
 	mkdir -p $(DSTS)/bootloader/rockpro
-	cp $(ROCKPRO_UBOOT_CONFIG) $(DSTS)/bootloader/rockpro/.config
+	cp $(SRCS)/configs/bootloader/rockpro_uboot.config $(DSTS)/bootloader/rockpro/.config
 	cd $(SRCS)/bootloader/u-boot && $(MAKE) mrproper && $(MAKE) -j$(NPROC) CROSS_COMPILE=$(CROSS_COMPILE) O=$(DSTS)/bootloader/rockpro BL31=$(BL31_ELF)
+	touch $@
 $(QEMU_UBOOT_BIN): $(SRCS)/.bootloader
 	mkdir -p $(DSTS)/bootloader/qemu
-	cp $(QEMU_UBOOT_CONFIG) $(DSTS)/bootloader/qemu/.config
+	cp $(SRCS)/configs/bootloader/qemu_uboot.config $(DSTS)/bootloader/qemu/.config
 	cd $(SRCS)/bootloader/u-boot && $(MAKE) mrproper && $(MAKE) -j$(NPROC) qemu_arm64_defconfig O=$(DSTS)/bootloader/qemu && make CROSS_COMPILE=$(CROSS_COMPILE) O=$(DSTS)/bootloader/qemu
-$(DSTS)/bootloader/boot.scr: $(SRCS)/configs/bootloader/bootscript.txt $(ROCKPRO_MKIMAGE)
+	touch $@
+$(DSTS)/bootloader/boot.scr: $(RK3399_UBOOT_BIN)
 	$(ROCKPRO_MKIMAGE) -A arm64 -O linux -T script -d $(SRCS)/configs/bootloader/bootscript.txt $(DSTS)/bootloader/boot.scr
 	
 BUILD = 7.0.0-rc6wb-0.1
-IMAGE: $(DSTS)/kernel/build_arm64/arch/arm64/boot/Image
-DTBS: $(DSTS)/kernel/build_arm64/arch/arm64/boot/dts/.dtbs-list.cmd
-
+KERNEL_IMAGE = $(DSTS)/.kernel_image
+KERNEL_DTBS = $(DSTS)/.kernel_dtbs
+KERNEL_MODULES = $(DSTS)/.kernel_modules
 KERNEL_BUILD_DSTS = $(DSTS)/kernel/build_arm64
 LINUX_STABLE = $(SRCS)/kernel/linux-stable
-$(IMAGE): $(SRCS)/.kernel
+$(KERNEL_IMAGE): $(SRCS)/.kernel
 	mkdir -p $(DSTS)/kernel/modules $(KERNEL_BUILD_DSTS)
 	cp $(SRCS)/configs/rockpro_kernel.config $(KERNEL_BUILD_DSTS)/.config
 	cd $(LINUX_STABLE) && $(MAKE) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) O=$(KERNEL_BUILD_DSTS) prepare
 	cd $(LINUX_STABLE) && $(MAKE) -j$(NPROC) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) Image.gz O=$(KERNEL_BUILD_DSTS)
-$(DTBS): $(IMAGE)
+	touch $@
+$(KERNEL_DTBS): $(KERNEL_IMAGE)
 	cd $(LINUX_STABLE) && $(MAKE) -j$(NPROC) ARCH=arm64 dtbs CROSS_COMPILE=$(CROSS_COMPILE) O=$(KERNEL_BUILD_DSTS)
+	touch $@
+$(KERNEL_MODULES): $(KERNEL_DTBS)
 	cd $(LINUX_STABLE) && $(MAKE) -j$(NPROC) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) INSTALL_MOD_PATH=$(DSTS)/kernel/modules O=$(KERNEL_BUILD_DSTS)
 	cd $(LINUX_STABLE) && $(MAKE) -j$(NPROC) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) INSTALL_MOD_PATH=$(DSTS)/kernel/modules O=$(KERNEL_BUILD_DSTS) modules_install
+	touch $@
+
+DROPBEAR = $(DSTS)/.dropbear_stamp
+BUSYBOX = $(DSTS)/.busybox_stamp
+APP_DSTS = $(DSTS)/additional_apps
+additional_apps: $(DROPBEAR) $(BUSYBOX)
+$(DROPBEAR): $(SRCS)/.dropbear
+	mkdir $(APP_DSTS)/dropbear
+	cd $(SRCS)/additional_apps/dropbear && ./configure --host=aarch64-linux-gnu --disable-lastlog --disable-utmp --disable-utmpx --disable-wtmp --disable-wtmpx --enable-static --disable-zlib CROSS_COMPILE=$(CROSS_COMPILE)
+	cd $(SRCS)/additional_apps/dropear && $(MAKE) -j$(NPROC) PROGRAMS="dropbear dropbearkey" DESTDIR=$(APP_DSTS)/dropbear install
+	touch $@
+$(BUSYBOX): $(SRCS)/.busybox
+
+# NEED SQLite Headers
 
 RFS = $(DSTS)/rfs
-rootfs: $(SRCS)/.rootfs
-$(SRCS)/.rootfs: $(IMAGE)
+ROOTFS: $(DSTS)/.rootfs
+$(ROOTFS): $(KERNEL_MODULES) $(additional_apps)
 	mkdir -p $(RFS)/bin $(RFS)/dev $(RFS)/etc/init.d $(RFS)/home $(RFS)/lib $(RFS)/proc $(RFS)/sbin $(RFS)/sys $(RFS)/tmp $(RFS)/usr/bin $(RFS)/usr/lib $(RFS)/usr/sbin $(RFS)/var/log
 	cd $(RFS) && ln -s lib lib64
 	cp -r $(SRCS)/rfs_skeleton/* $(RFS)/etc/
@@ -131,24 +151,13 @@ $(SRCS)/.rootfs: $(IMAGE)
 	cd $(RFS) && mknod -m 600 dev/console c 5 1
 	cp -a $(DSTS)/kernel/modules/lib/modules $(RFS)/lib/
 	rm -r $(RFS)/lib/modules/$(BUILD)/build
-	touch $@
-
-APP_DSTS = $(DSTS)/additional_apps
-additional_apps:
-$(RFS)/sbin/dropbear: $(SRCS)/.dropbear $(SRCS)/.rootfs
-	mkdir $(APP_DSTS)/dropbear
-	cd $(SRCS)/additional_apps/dropbear && ./configure --host=aarch64-linux-gnu --disable-lastlog --disable-utmp --disable-utmpx --disable-wtmp --disable-wtmpx --enable-static --disable-zlib CROSS_COMPILE=$(CROSS_COMPILE)
-	cd $(SRCS)/additional_apps/dropear && $(MAKE) -j$(NPROC) PROGRAMS="dropbear dropbearkey" DESTDIR=$(APP_DSTS)/dropbear install
 	cp  $(APP_DSTS)/dropbear/usr/local/sbin/dropbear $(RFS)/sbin/dropbear
 	cp $(APP_DSTS)/dropbear/usr/local/bin/dropbearkey $(RFS)/bin/dropbearkey
-$(RFS)/bin/busybox: 
-# NEED SQLite Headers
+	############################# NEED TO DO THE SAME WITH BUSYBOX HERE ################################
+	touch $@
 
-# https://stackoverflow.com/questions/25005637/makefile-rule-depend-on-directory-content-changes
-RFS_DIRS = $(shell find $(RFS) -type d)
-RFS_FILES = $(shell find $(RFS) -type f -name '*')
-gen_initramfs: $(IMAGE) $(DSTS)/kernel/rockpro/uRamdisk
-$(KERNEL_BUILD_DSTS)/initramfs.cpio.gz: $(KERNEL_BUILD_DSTS)/usr/gen_init_cpio $(RFS_DIRS) $(RFS_FILES)
+gen_initramfs: $(KERNEL_BUILD_DSTS)/initramfs.cpio.gz $(DSTS)/kernel/rockpro/uRamdisk
+$(KERNEL_BUILD_DSTS)/initramfs.cpio.gz: $(KERNEL_MODULES) $(ROOTFS)
 	mkdir -p $(DSTS)/kernel/rockpro $(DSTS)/kernel/qemu
 	cp $(KERNEL_BUILD_DSTS)/usr/gen_init_cpio $(SRCS)/linux-stable/usr
 	$(shell $(SRCS)/linux-stable/usr/gen_initramfs.sh -o $(KERNEL_BUILD_DSTS)/initramfs.cpio -u 1000 -g 1000 $(RFS))
