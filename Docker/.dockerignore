@@ -5,7 +5,3 @@ srcs/*
 !srcs/configs
 !srcs/rfs_skeleton
 dsts/*
-!dsts/rfs/
-dsts/rfs/*
-!dsts/rfs/.rfs_make_tracker
-

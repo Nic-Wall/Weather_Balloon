@@ -1,2 +1,0 @@
-This file exists to be tracked by Make and ensure rfs exists when the Github repo is cloned.
-If one wishes to ensure the ramdisk is rebuilt one only needs to touch this file and re-run make.
