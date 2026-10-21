@@ -20,3 +20,4 @@ make
 libcrypt1
 xz-utils
 kmod
+bzip2

@@ -32,7 +32,7 @@ NPROC = $(shell nproc)
 
 # Targets
 .PHONY: all clean fetch
-all: fetch full_bootloader kernel additional_apps rootfs gen_initramfs
+all: fetch bootloader kernel additional_apps rootfs gen_initramfs
 fetch: $(SRCS)/.toolchain $(SRCS)/.bootloader $(SRCS)/.busybox $(SRCS)/.kernel $(SRCS)/.sqlite $(SRCS)/.dropbear
 
 # Cross Compilation Toolchain
@@ -134,17 +134,19 @@ BUSYBOX = $(DSTS)/.busybox_stamp
 APP_DSTS = $(DSTS)/additional_apps
 additional_apps: $(DROPBEAR) $(BUSYBOX)
 $(DROPBEAR): $(SRCS)/.dropbear
-	mkdir $(APP_DSTS)/dropbear
+	mkdir -p $(APP_DSTS)/dropbear
 	cd $(SRCS)/additional_apps/dropbear && ./configure --host=aarch64-linux-gnu --disable-lastlog --disable-utmp --disable-utmpx --disable-wtmp --disable-wtmpx --enable-static --disable-zlib CROSS_COMPILE=$(CROSS_COMPILE)
-	cd $(SRCS)/additional_apps/dropear && $(MAKE) -j$(NPROC) PROGRAMS="dropbear dropbearkey" DESTDIR=$(APP_DSTS)/dropbear install
+	cd $(SRCS)/additional_apps/dropbear && $(MAKE) -j$(NPROC) PROGRAMS="dropbear dropbearkey" DESTDIR=$(APP_DSTS)/dropbear install
 	touch $@
 $(BUSYBOX): $(SRCS)/.busybox
-	mkdir $(APP_DSTS)/busybox
+	mkdir -p $(APP_DSTS)/busybox
 	cp $(SRCS)/configs/rockpro_busybox.config $(SRCS)/additional_apps/busybox/.config
+	cd $(SRCS)/additional_apps/busybox && $(MAKE) -j$(NPROC) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE)
+	touch $@
 # NEED SQLite Headers
 
 RFS = $(DSTS)/rfs
-ROOTFS_STAMP: $(DSTS)/.rootfs
+ROOTFS_STAMP = $(DSTS)/.rootfs
 INCLUDE_ADDAPPS = $(DSTS)/.include_addApps
 rootfs: $(ROOTFS_STAMP) $(INCLUDE_ADDAPPS)
 $(ROOTFS_STAMP): $(KERNEL_MODULES)
@@ -155,14 +157,13 @@ $(ROOTFS_STAMP): $(KERNEL_MODULES)
 	cd $(RFS) && mknod -m 600 dev/console c 5 1
 	cp -a $(DSTS)/kernel/modules/lib/modules $(RFS)/lib/
 	rm -r $(RFS)/lib/modules/$(BUILD)/build
+	touch $@
 $(INCLUDE_ADDAPPS): $(additional_apps) $(ROOTFS_STAMP)
 	$(info Copying dropbear and dropbearkey into the rootfs...)
 	cp  $(APP_DSTS)/dropbear/usr/local/sbin/dropbear $(RFS)/sbin/dropbear
 	cp $(APP_DSTS)/dropbear/usr/local/bin/dropbearkey $(RFS)/bin/dropbearkey
 	$(info Copying busybox into the rootfs...)
-	cd $(SRCS)/configs/additional_apps/busybox && $(MAKE) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) && make ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) install
-	chown root:root $(RFS)/bin/busybox
-	chmod u+s $(RFS)/bin/busybox
+	cd $(SRCS)/configs/additional_apps/busybox && $(MAKE) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) install
 	mkdir -p $(RFS)/usr/share/udhcp
 	cp $(SRCS)/additional_apps/busybox/examples/udhcp/simple.script $(RFS)/usr/share/udhcp/default.script
 	touch $@
@@ -171,7 +172,7 @@ gen_initramfs: $(KERNEL_BUILD_DSTS)/initramfs.cpio.gz $(DSTS)/kernel/rockpro/uRa
 $(KERNEL_BUILD_DSTS)/initramfs.cpio.gz: $(kernel) $(rootfs)
 	mkdir -p $(DSTS)/kernel/rockpro $(DSTS)/kernel/qemu
 	cp $(KERNEL_BUILD_DSTS)/usr/gen_init_cpio $(SRCS)/linux-stable/usr
-	$(shell $(SRCS)/linux-stable/usr/gen_initramfs.sh -o $(KERNEL_BUILD_DSTS)/initramfs.cpio -u 1000 -g 1000 $(RFS))
+	$(shell $(SRCS)/linux-stable/usr/gen_initramfs.sh -o $(KERNEL_BUILD_DSTS)/initramfs.cpio -u 1000 -g 1000 $(RFS) $(SRCS)/config/gen_initramfs.list)
 	gzip $(KERNEL_BUILD_DSTS)/initramfs.cpio
 $(DSTS)/kernel/rockpro/uRamdisk: $(kernel) $(bootloader)
 	cp $(KERNEL_BUILD_DSTS)/initramfs.cpio.gz $(DSTS)/kernel/rockpro/
