@@ -72,17 +72,22 @@ $(SRCS)/.busybox:
 # SQLite
 SQLITE_URL = https://sqlite.org/2026/sqlite-autoconf-3540000.tar.gz
 SQLITE_SHASUM = 134ec0802dda5795816e25d25872d20b312cb3973438c49b30bc40b7705ea9ed
+SQLITE_VERSION = 3540000
 $(SRCS)/.sqlite:
 	$(call file_fetch,$(SQLITE_URL),$(SQLITE_SHASUM),$(SRCS)/additional_apps)
 	touch $@
 
 # Dropbear SSH
-#LIBXCRYPT_URL = https://github.com/besser82/libxcrypt/releases/download/v4.5.2/libxcrypt-4.5.2.tar.xz
-#LIBXCRYPT_SHASUM = 71513a31c01a428bccd5367a32fd95f115d6dac50fb5b60c779d5c7942aec071
+LIBXCRYPT_URL = https://github.com/besser82/libxcrypt/releases/download/v4.5.2/libxcrypt-4.5.2.tar.xz
+LIBXCRYPT_SHASUM = 71513a31c01a428bccd5367a32fd95f115d6dac50fb5b60c779d5c7942aec071
+LIBXCRYPT_VERSION = 4.5.2
 DROPBEAR_URL = https://github.com/mkj/dropbear.git 
 DROPBEAR_SHASUM = 59870ad43153fe8d4f1c96f5d5752116c94f31ff
 $(SRCS)/.dropbear:
 	$(call git_fetch,$(DROPBEAR_URL),$(DROPBEAR_SHASUM),$(SRCS)/additional_apps)
+	touch $@
+$(SRCS)/.libxcrypt:
+	$(call file_fetch,$(LIBXCRYPT_URL),$(LIBXCRYPT_SHASUM),$(SRCS)/additional_apps)
 	touch $@
 
 BL31 = $(DSTS)/.rk3399_bl3
@@ -129,13 +134,19 @@ $(KERNEL_MODULES): $(KERNEL_DTBS)
 	cd $(LINUX_STABLE) && $(MAKE) -j$(NPROC) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) INSTALL_MOD_PATH=$(DSTS)/kernel/modules O=$(KERNEL_BUILD_DSTS) modules_install
 	touch $@
 
+LIBXCRYPT = $(DSTS)/.libxcrypt_stamp
 DROPBEAR = $(DSTS)/.dropbear_stamp
 BUSYBOX = $(DSTS)/.busybox_stamp
 APP_DSTS = $(DSTS)/additional_apps
 additional_apps: $(DROPBEAR) $(BUSYBOX)
-$(DROPBEAR): $(SRCS)/.dropbear
+$(LIBXCRYPT): $(SRCS)/.libxcrypt
+	mkdir -p $(APP_DSTS)/libxcrypt-$(LIBXCRYPT_VERSION)
+	cd $(SRCS)/additional_apps/libxcrypt-$(LIBXCRYPT_VERSION) && ./configure --prefix=/usr --enable-static --disable-shared --enable-obsolete-api=yes --host=aarch64-buildroot-linux-gnu CC=$(CROSS_COMPILE)gcc AR=$(CROSS_COMPILE)ar RANLIB=$(CROSS_COMPILE)ranlib 
+	cd $(SRCS)/additional_apps/libxcrypt-$(LIBXCRYPT_VERSION) && $(MAKE) -j$(NPROC) && $(MAKE) DESTDIR=$(APP_DSTS)/libxcrypt-$(LIBXCRYPT_VERSION) install
+	touch $@
+$(DROPBEAR): $(SRCS)/.dropbear $(LIBXCRYPT)
 	mkdir -p $(APP_DSTS)/dropbear
-	cd $(SRCS)/additional_apps/dropbear && ./configure --host=aarch64-linux-gnu --disable-lastlog --disable-utmp --disable-utmpx --disable-wtmp --disable-wtmpx --enable-static --disable-zlib CROSS_COMPILE=$(CROSS_COMPILE)
+	cd $(SRCS)/additional_apps/dropbear && ./configure --host=aarch64-buildroot-linux-gnu CC=$(CROSS_COMPILE)gcc AR=$(CROSS_COMPILE)ar RANLIB=$(CROSS_COMPILE)ranlib --disable-lastlog --disable-utmp --disable-utmpx --disable-wtmp --disable-wtmpx --enable-static --disable-zlib CPPFLAGS="-I/$(APP_DSTS)/libxcrypt-$(LIBXCRYPT_VERSION)/usr/include" LDFLAGS="-L/$(APP_DSTS)/libxcrypt-$(LIBXCRYPT_VERSION)/usr/lib"
 	cd $(SRCS)/additional_apps/dropbear && $(MAKE) -j$(NPROC) PROGRAMS="dropbear dropbearkey" DESTDIR=$(APP_DSTS)/dropbear install
 	touch $@
 $(BUSYBOX): $(SRCS)/.busybox
@@ -151,19 +162,17 @@ INCLUDE_ADDAPPS = $(DSTS)/.include_addApps
 rootfs: $(ROOTFS_STAMP) $(INCLUDE_ADDAPPS)
 $(ROOTFS_STAMP): $(KERNEL_MODULES)
 	mkdir -p $(RFS)/bin $(RFS)/dev $(RFS)/etc/init.d $(RFS)/home $(RFS)/lib $(RFS)/proc $(RFS)/sbin $(RFS)/sys $(RFS)/tmp $(RFS)/usr/bin $(RFS)/usr/lib $(RFS)/usr/sbin $(RFS)/var/log
-	cd $(RFS) && ln -s lib lib64
+	cd $(RFS) && ln -sf lib lib64
 	cp -r $(SRCS)/rfs_skeleton/* $(RFS)/etc/
-	cd $(RFS) && mknod -m 666 dev/null c 1 3
-	cd $(RFS) && mknod -m 600 dev/console c 5 1
 	cp -a $(DSTS)/kernel/modules/lib/modules $(RFS)/lib/
-	rm -r $(RFS)/lib/modules/$(BUILD)/build
+	rm -r $(RFS)/lib/modules/$(BUILD)+/build
 	touch $@
 $(INCLUDE_ADDAPPS): $(additional_apps) $(ROOTFS_STAMP)
 	$(info Copying dropbear and dropbearkey into the rootfs...)
 	cp  $(APP_DSTS)/dropbear/usr/local/sbin/dropbear $(RFS)/sbin/dropbear
 	cp $(APP_DSTS)/dropbear/usr/local/bin/dropbearkey $(RFS)/bin/dropbearkey
 	$(info Copying busybox into the rootfs...)
-	cd $(SRCS)/configs/additional_apps/busybox && $(MAKE) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) install
+	cd $(SRCS)/additional_apps/busybox && $(MAKE) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) install
 	mkdir -p $(RFS)/usr/share/udhcp
 	cp $(SRCS)/additional_apps/busybox/examples/udhcp/simple.script $(RFS)/usr/share/udhcp/default.script
 	touch $@
