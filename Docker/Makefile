@@ -177,16 +177,13 @@ $(INCLUDE_ADDAPPS): $(additional_apps) $(ROOTFS_STAMP)
 	cp $(SRCS)/additional_apps/busybox/examples/udhcp/simple.script $(RFS)/usr/share/udhcp/default.script
 	touch $@
 
-gen_initramfs: $(KERNEL_BUILD_DSTS)/initramfs.cpio.gz $(DSTS)/kernel/rockpro/uRamdisk
+gen_initramfs: $(KERNEL_BUILD_DSTS)/initramfs.cpio.gz $(DSTS)/.uramdisks
 $(KERNEL_BUILD_DSTS)/initramfs.cpio.gz: $(kernel) $(rootfs)
 	mkdir -p $(DSTS)/kernel/rockpro $(DSTS)/kernel/qemu
-	cp $(KERNEL_BUILD_DSTS)/usr/gen_init_cpio $(SRCS)/linux-stable/usr
-	$(shell $(SRCS)/linux-stable/usr/gen_initramfs.sh -o $(KERNEL_BUILD_DSTS)/initramfs.cpio -u 1000 -g 1000 $(RFS) $(SRCS)/config/gen_initramfs.list)
+	$(shell cd $(KERNEL_BUILD_DSTS) && $(SRCS)/kernel/linux-stable/usr/gen_initramfs.sh -o $(KERNEL_BUILD_DSTS)/initramfs.cpio -u 1000 -g 1000 $(RFS) $(SRCS)/configs/gen_initramfs.list)
 	gzip $(KERNEL_BUILD_DSTS)/initramfs.cpio
-$(DSTS)/kernel/rockpro/uRamdisk: $(kernel) $(bootloader)
-	cp $(KERNEL_BUILD_DSTS)/initramfs.cpio.gz $(DSTS)/kernel/rockpro/
-	cp $(KERNEL_BUILD_DSTS)/initramfs.cpio.gz $(DSTS)/kernel/qemu/
-	$(shell $(SRCS)/bootloader/rockpro/tools/mkimage -A arm64 -O linux -T ramdisk -d $(KERNEL_BUILD_DSTS)/initramfs.cpio.gz $(DSTS)/kernel/rockpro/uRamdisk)
-	$(shell $(SRCS)/bootloader/qemu/tools/mkimage -A arm64 -O linux -T ramdisk -d $(KERNEL_BUILD_DSTS)/initramfs.cpio.gz $(DSTS)/kernel/qemu/uRamdisk)
-
+$(DSTS)/.uramdisks: $(kernel) $(bootloader) $(KERNEL_BUILD_DSTS)/initramfs.cpio.gz
+	$(DSTS)/bootloader/rockpro/tools/mkimage -A arm64 -O linux -T ramdisk -d $(KERNEL_BUILD_DSTS)/initramfs.cpio.gz $(DSTS)/kernel/rockpro/uRamdisk
+	$(DSTS)/bootloader/qemu/tools/mkimage -A arm64 -O linux -T ramdisk -d $(KERNEL_BUILD_DSTS)/initramfs.cpio.gz $(DSTS)/kernel/qemu/uRamdisk
+	touch $@
 clean:
