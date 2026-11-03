@@ -11,6 +11,6 @@ Docs/.obsidian/
 Docker/srcs/*
 !Docker/srcs/configs
 !Docker/srcs/rfs_skeleton
-
+!Docker/srcs/char_drivers
 # Everything in dsts except the .empty used to keep the directory as pullable in git clone
 Docker/dsts/*
