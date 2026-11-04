@@ -3,12 +3,13 @@
 #include <linux/i2c.h>
 #include <linux/hwmon.h>
 
-// Links used to learn:
-// https://www.adafruit.com/product/5183
-// I2C address of 0x38
-// https://www.kernel.org/doc/html/latest/i2c/writing-clients.html
-// https://www.youtube.com/watch?v=pESMpoQnfDU
-// https://github.com/torvalds/linux/blob/master/drivers/hwmon/aht10.c
+/* Links used to learn:
+ * https://www.adafruit.com/product/5183
+ * 	I2C address of 0x38
+ * https://www.kernel.org/doc/html/latest/i2c/writing-clients.html
+ * https://github.com/torvalds/linux/blob/master/drivers/hwmon/aht10.c
+ * https://cdn.sparkfun.com/assets/8/a/1/5/0/DHT20.pdf
+ */
 
 // 1. Determine Compatible Devices: What device(s) this driver supports
 static const struct i2c_device_id dht20_idtable[] = {
